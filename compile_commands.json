@@ -1,0 +1,17 @@
+[
+  {
+    "file": "src/milestone3.cpp",
+    "arguments": [
+      "/usr/bin/g++",
+      "-std=c++20",
+      "-Wall",
+      "-O2",
+      "-Iinclude",
+      "src/milestone3.cpp",
+      "-o",
+      "milestone3"
+    ],
+    "directory": "/home/jhoarch/Documents/Homework/milestone3",
+    "output": "milestone3"
+  }
+]

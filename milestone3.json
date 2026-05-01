@@ -1,0 +1,19 @@
+{
+    "CacheManagerBenchmark": [
+        {
+            "testCase1": [
+                {
+                    "ratioOfMethods": [
+                        {
+                            "getItem": 80,
+                            "add": 9,
+                            "contains": 2,
+                            "remove": 9,
+                            "clear": 1
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

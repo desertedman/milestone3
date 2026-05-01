@@ -1,0 +1,92 @@
+
+Processing staticRatio benchmark.
+
+
+Configuration for benchmark run:
+
+	testType: static
+	testSize: 10
+	testIterations: 10
+	degreeOfParallelism: 100
+	sleepInterval: 1
+
+Configuration for testCase1:
+
+	ratioOfMethods: 
+		getItem: 80
+		add: 9
+		contains: 2
+		remove: 9
+		clear: 1
+Added key: 0; value: 'Test value for key: 0'
+Added key: 1; value: 'Test value for key: 1'
+Added key: 2; value: 'Test value for key: 2'
+Added key: 3; value: 'Test value for key: 3'
+Added key: 4; value: 'Test value for key: 4'
+Added key: 5; value: 'Test value for key: 5'
+Added key: 6; value: 'Test value for key: 6'
+Added key: 7; value: 'Test value for key: 7'
+Added key: 8; value: 'Test value for key: 8'
+Added key: 9; value: 'Test value for key: 9'
+Added key: 10; value: 'Test value for key: 10'
+threadId	end time	iter #		avg		min		max		
+
+
+Retrieved key: 2; with value: Test value for key: 2
+Key: 2000 not found (expected)!
+	1	00:00:00	0		0.000000	0.000000	0.000000
+
+
+Retrieved key: 10; with value: Test value for key: 10
+Key: 10000 not found (expected)!
+	1	00:00:00	1		0.000000	0.000000	0.000000
+
+
+Retrieved key: 10; with value: Test value for key: 10
+Key: 10000 not found (expected)!
+	1	00:00:00	2		0.000000	0.000000	0.000000
+
+
+Retrieved key: 1; with value: Test value for key: 1
+Key: 1000 not found (expected)!
+	1	00:00:00	3		0.000000	0.000000	0.000000
+
+
+Retrieved key: 6; with value: Test value for key: 6
+Key: 6000 not found (expected)!
+	1	00:00:00	4		0.000000	0.000000	0.000000
+
+
+Retrieved key: 10; with value: Test value for key: 10
+Key: 10000 not found (expected)!
+	1	00:00:00	5		0.000000	0.000000	0.000000
+
+
+Retrieved key: 8; with value: Test value for key: 8
+Key: 8000 not found (expected)!
+	1	00:00:00	6		0.000000	0.000000	0.000000
+
+
+Retrieved key: 2; with value: Test value for key: 2
+Key: 2000 not found (expected)!
+	1	00:00:00	7		0.000000	0.000000	0.000000
+
+
+Retrieved key: 10; with value: Test value for key: 10
+Key: 10000 not found (expected)!
+	1	00:00:00	8		0.000000	0.000000	0.000000
+
+
+Retrieved key: 5; with value: Test value for key: 5
+Key: 5000 not found (expected)!
+	1	00:00:00	9		0.000000	0.000000	0.000000
+
+
+
+
+Finished processing benchmark.
+
+
+
+
+End of tests
