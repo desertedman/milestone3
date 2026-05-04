@@ -58,6 +58,7 @@
 #include <string>
 #include <chrono>
 #include <random>
+#include <thread>
 
 #include "json.hpp"
 
@@ -66,8 +67,14 @@ using json = nlohmann::json;
 #define _CRT_SECURE_NO_WARNINGS
 #define CONFIG_FILE "milestone3_config.json"
 
+
 // Global variable to be used for logging output
 std::ofstream _outFile;
+
+cache::CacheManager<int, std::string, bench::TbbBench> cacheManager;
+cache::CacheManager<int, std::string, bench::TbbBench> &getCacheManager() {
+  return cacheManager;
+}
 
 /**
 *
@@ -154,6 +161,103 @@ void getItemTest(json config, cache::CacheManager<int, std::string, bench::TbbBe
     }
 }
 
+void benchmarkCacheManager(const json &config, const int testSize, const int threadId, const std::chrono::system_clock::time_point &start) {
+  // std::cout << "threadId " + std::to_string(threadId) + " running...\n";
+
+  // need to write out the data for each timed iteration in the following format:
+  // 
+  // threadId    end time    iter#   avg     min     max     
+  // 
+  // <threadId1> <time1>         1   1.2     0.9     1.4
+  // <threadId2> <time2>         2   1.1     0.7     1.2
+  // ...
+
+  auto &cm = getCacheManager(); // Get cm using singleton
+
+  // Declare keys; put off generation til later
+  int existingKey{}, newKey{};
+  bool ret{};
+
+  // Setup random key generation
+  std::random_device rd{};
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution newDistr{
+      testSize + 1, INT_MAX}; // Generate random key > testSize
+  std::uniform_int_distribution existingDistr{
+      1, testSize}; // Generate random key 1 - testSize
+
+  // call the specific function to time
+  for (int i = 0; i < 10; i++) {
+    float average = 0.0;
+    float min = 0.0;
+    float max = 0.0;
+
+    // add more functions here
+    getItemTest(config, cm);
+
+    // Check if cache contains newKey (should not!)
+    do {
+      // Generate newKey
+      newKey = newDistr(gen); // (testSize + 1, INT_MAX)
+
+      ret = cm.contains(newKey);
+      if (ret != false) {
+        std::cout << "ALERT:\t\tnewKey already added! Generating new key...";
+      }
+    } while (ret != false); // Validate that newKey has not already been added
+
+    // Add newKey and value to cache
+    std::string value = "Test value for key: " + std::to_string(newKey);
+    ret = cm.add(newKey, value);
+
+    // Cache is full alert
+    // if (ret != true)
+    //     std::cout << "ERROR: Could not add to cache!" << std::endl;
+
+    // Verify that added key value is in the cache
+    ret = cm.contains(newKey);
+    // TODO: Replace with assert
+    if (ret != true)
+      std::cout << "\tERROR: Added newKey: returns false, expected true!"
+                << std::endl;
+
+    // Check for existingKey
+    do {
+      // Generate existingKey
+      existingKey = existingDistr(gen); // (1, testSize)
+
+      ret = cm.contains(existingKey);
+      if (ret != true) {
+        std::cout
+            << "\tALERT: existingKey already removed! Generating new key..."
+            << std::endl;
+      }
+    } while (ret !=
+             true); // Validate that existingKey has not already been removed
+
+    // Call remove on existingKey
+    cm.remove(existingKey);
+
+    // Verify that existingKey is no longer in cache
+    ret = cm.contains(existingKey);
+    // TODO: Replace with assert
+    if (ret != false)
+      std::cout << "\tERROR: Remove existingKey: returns true, expected false!"
+                << std::endl;
+
+    // write out the current values for this iteration
+    auto curIterEnd = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_seconds = curIterEnd - start;
+    // std::time_t iterEndTime =
+    // std::chrono::system_clock::to_time_t(curIterEnd);
+    std::string timeString = "00:00:00";
+
+    logToFileAndConsole("\t" + std::to_string(threadId) + "\t" + timeString +
+                        "\t" + std::to_string(i) + "\t\t" +
+                        std::to_string(average) + "\t" + std::to_string(min) +
+                        "\t" + std::to_string(max));
+  }
+}
 
 /**
 *
@@ -210,7 +314,7 @@ void timeWrapper(json config) {
     int testSize = config["Milestone3"][0]["defaultVariables"][0]["testSize"];
     
     // Allocate the cache manager
-    cache::CacheManager<int, std::string, bench::TbbBench> cm;
+    auto &cm = getCacheManager(); // Get cm using singleton
 
     // sample test load of the cache
     for (auto key = 0; key <= testSize; ++key) {
@@ -219,15 +323,6 @@ void timeWrapper(json config) {
         logToFileAndConsole("Added key: " + std::to_string(key) + "; value: '" + value + "'");
     }
 
-    // Declare keys; put off generation til later
-    int existingKey{}, newKey{};
-    bool ret{};
-
-    // Setup random key generation
-    std::random_device rd{};
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution newDistr{testSize + 1, INT_MAX};  // Generate random key > testSize
-    std::uniform_int_distribution existingDistr{1, testSize};       // Generate random key 1 - testSize
 
     // output some helpful comments to the console
     // add the load time calc and output here
@@ -240,86 +335,23 @@ void timeWrapper(json config) {
     // use the same output format as in milestone2 (method, timeWrapper, is left in this example).  
     //     Add thread ID as the first column.
 
-
-    // call the specific function to time
-    for (int i = 0; i < 10; i++) {
-        float average = 0.0;
-        float min = 0.0;
-        float max = 0.0;
-        int threadId = 1;
-
-        // add more functions here
-        getItemTest(config, cm);
-
-        // Check if cache contains newKey (should not!)
-        do {
-            // Generate newKey
-            newKey = newDistr(gen);  // (testSize + 1, INT_MAX)
-
-            ret = cm.contains(newKey);
-            if (ret != false) {
-                std::cout << "ALERT:\t\tnewKey already added! Generating new key...";
-            }
-            //
-            // else {
-            //     logToFileAndConsole("SUCCESS:\t\tnewKey not found! Adding key " + std::to_string(newKey) + " ");
-            // }
-        } while (ret != false);  // Validate that newKey has not already been added
-
-
-
-
-
-        // Add newKey and value to cache
-        std::string value = "Test value for key: " + std::to_string(newKey);
-        ret = cm.add(newKey, value);
-
-        // Cache is full alert
-        // if (ret != true)
-        //     std::cout << "ERROR: Could not add to cache!" << std::endl;
-
-        // Verify that added key value is in the cache
-        ret = cm.contains(newKey);
-        // TODO: Replace with assert
-        if (ret != true)
-            std::cout << "\tERROR: Added newKey: returns false, expected true!" << std::endl;
-
-
-
-
-
-        // Check for existingKey
-        do {
-            // Generate existingKey
-            existingKey = existingDistr(gen);  // (1, testSize)
-
-            ret = cm.contains(existingKey);
-            if (ret != true) {
-                std::cout << "\tALERT: existingKey already removed! Generating new key..." << std::endl;
-            }
-            //
-            // else {
-            //     logToFileAndConsole("SUCCESS:\t\texistingKey found! Removing key " + std::to_string(existingKey) + " ");
-            // }
-        } while (ret != true);  // Validate that existingKey has not already been removed
-
-        // Call remove on existingKey
-        cm.remove(existingKey);
-
-        // Verify that existingKey is no longer in cache
-        ret = cm.contains(existingKey);
-        // TODO: Replace with assert
-        if (ret != false)
-            std::cout << "\tERROR: Remove existingKey: returns true, expected false!" << std::endl;
-
-        // write out the current values for this iteration
-        auto curIterEnd = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_seconds = curIterEnd - start;
-        //std::time_t iterEndTime = std::chrono::system_clock::to_time_t(curIterEnd);
-        std::string timeString = "00:00:00";
-
-        logToFileAndConsole("\t" + std::to_string(threadId) + "\t" + timeString + "\t" + std::to_string(i) + "\t\t" + std::to_string(average) + "\t" + std::to_string(min) + "\t" + std::to_string(max));
-    }
+    benchmarkCacheManager(config, testSize, 0, start);
+    // // Dispatch threads to run benchmarks
+    // const size_t numThreads{config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"]};
+    // std::vector<std::thread> threads;
+    // threads.reserve(numThreads);
+    // assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
+    //
+    // for (size_t i{0}; i < 1; i++) {
+    //     threads.emplace_back(benchmarkCacheManager, config, testSize, i, start);
+    // }
+    //
+    // // Wait until all threads are finished
+    // for (auto &t : threads) {
+    //     if (t.joinable()) {
+    //         t.join();
+    //     }
+    // }
 
     logToFileAndConsole("\n\n");
 
