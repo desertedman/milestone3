@@ -72,9 +72,23 @@ using json = nlohmann::json;
 std::ofstream _outFile;
 
 cache::CacheManager<int, std::string, bench::TbbBench> cacheManager;
+// Singleton to get cacheManager
 cache::CacheManager<int, std::string, bench::TbbBench> &getCacheManager() {
   return cacheManager;
 }
+
+struct Ratio {
+    int getItemRatio;
+    int addRatio;
+    int containsRatio;
+    int removeRatio;
+    int clearRatio;
+};
+
+enum class LOGGING_LEVEL {
+  ON,
+  OFF,
+};
 
 /**
 *
@@ -142,7 +156,7 @@ void logToFileAndConsole(std::string message) {
 *
 * @return   nothing, but output is sent to console and written to output file
 */
-void getItemTest(json config, cache::CacheManager<int, std::string, bench::TbbBench> &cm) {
+void getItemTest(json config, cache::CacheManager<int, std::string, bench::TbbBench> &cm, const LOGGING_LEVEL level) {
     // sample code to retrieve and print a found entry
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -161,7 +175,28 @@ void getItemTest(json config, cache::CacheManager<int, std::string, bench::TbbBe
     }
 }
 
-void benchmarkCacheManager(const json &config, const int testSize, const int threadId, const std::chrono::system_clock::time_point &start) {
+void getItemTest2(const json config, cache::CacheManager<int, std::string, bench::TbbBench> &cm, const int testSize) {
+  // Setup random key generation
+  std::random_device rd{};
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution newDistr{
+      testSize + 1, INT_MAX}; // Generate random key > testSize
+  std::uniform_int_distribution existingDistr{
+      1, testSize}; // Generate random key 1 - testSize
+
+  int newKey{newDistr(gen)};
+  int existingKey{existingDistr(gen)}; // (1, testSize)
+
+  // Try key that is in cache
+  auto val{cm.getItem(existingKey)};
+  logToFileAndConsole("key: " + std::to_string(existingKey) + ", value: " + *val);
+
+  // Try key not in cache
+  val = cm.getItem(newKey);
+  logToFileAndConsole("key: " + std::to_string(newKey) + ", value: " + *val);
+}
+
+void benchmarkCacheManager(const json &config, const int testSize, const int threadId, const std::chrono::system_clock::time_point &start, const Ratio &ratios, const LOGGING_LEVEL level) {
   // std::cout << "threadId " + std::to_string(threadId) + " running...\n";
 
   // need to write out the data for each timed iteration in the following format:
@@ -188,12 +223,10 @@ void benchmarkCacheManager(const json &config, const int testSize, const int thr
 
   // call the specific function to time
   for (int i = 0; i < 10; i++) {
-    float average = 0.0;
-    float min = 0.0;
-    float max = 0.0;
+    float average{0.0}, min{0.0}, max{0.0};
 
-    // add more functions here
-    getItemTest(config, cm);
+    // NOTE: This may be trying to get keys that may have been removed in some iterations!
+    getItemTest(config, cm, level);
 
     // Check if cache contains newKey (should not!)
     do {
@@ -201,14 +234,17 @@ void benchmarkCacheManager(const json &config, const int testSize, const int thr
       newKey = newDistr(gen); // (testSize + 1, INT_MAX)
 
       ret = cm.contains(newKey);
-      if (ret != false) {
-        std::cout << "ALERT:\t\tnewKey already added! Generating new key...";
+      if (ret != false && level == LOGGING_LEVEL::ON) {
+        std::cout << "ALERT:\t\tnewKey already added! Generating new key...\n";
       }
     } while (ret != false); // Validate that newKey has not already been added
 
     // Add newKey and value to cache
     std::string value = "Test value for key: " + std::to_string(newKey);
     ret = cm.add(newKey, value);
+    // if (level == LOGGING_LEVEL::ON)
+    //   std::cout << "\t\tAdded: " + std::to_string(newKey) +
+    //                    ", Value: " + *cm.getItem(newKey) + "\n";
 
     // Cache is full alert
     // if (ret != true)
@@ -218,8 +254,7 @@ void benchmarkCacheManager(const json &config, const int testSize, const int thr
     ret = cm.contains(newKey);
     // TODO: Replace with assert
     if (ret != true)
-      std::cout << "\tERROR: Added newKey: returns false, expected true!"
-                << std::endl;
+      std::cout << "\tERROR: Added newKey: returns false, expected true!\n";
 
     // Check for existingKey
     do {
@@ -227,23 +262,22 @@ void benchmarkCacheManager(const json &config, const int testSize, const int thr
       existingKey = existingDistr(gen); // (1, testSize)
 
       ret = cm.contains(existingKey);
-      if (ret != true) {
+      if (ret != true && level == LOGGING_LEVEL::ON) {
         std::cout
-            << "\tALERT: existingKey already removed! Generating new key..."
-            << std::endl;
+            << "\tALERT: existingKey already removed! Generating new key...\n";
       }
     } while (ret !=
              true); // Validate that existingKey has not already been removed
 
     // Call remove on existingKey
     cm.remove(existingKey);
+    std::cout << "Removed key: " + std::to_string(existingKey) + "\n";
 
     // Verify that existingKey is no longer in cache
     ret = cm.contains(existingKey);
     // TODO: Replace with assert
     if (ret != false)
-      std::cout << "\tERROR: Remove existingKey: returns true, expected false!"
-                << std::endl;
+      std::cout << "\tERROR: Remove existingKey: returns true, expected false!\n";
 
     // write out the current values for this iteration
     auto curIterEnd = std::chrono::system_clock::now();
@@ -252,10 +286,26 @@ void benchmarkCacheManager(const json &config, const int testSize, const int thr
     // std::chrono::system_clock::to_time_t(curIterEnd);
     std::string timeString = "00:00:00";
 
-    logToFileAndConsole("\t" + std::to_string(threadId) + "\t" + timeString +
+    logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString +
                         "\t" + std::to_string(i) + "\t\t" +
                         std::to_string(average) + "\t" + std::to_string(min) +
                         "\t" + std::to_string(max));
+  }
+}
+
+void testCacheManager(const json &config) {
+  auto &cm = getCacheManager();
+
+  [[maybe_unused]] int testSize =
+      config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+  for (int key = 10; key < 20; key++) {
+    std::string value = "Test value for key: " + std::to_string(key);
+    cm.add(key, value);
+  }
+
+  for (int key = 0; key < 20; key++) {
+    auto val = cm.getItem(key);
+    std::cout << "Key: " + std::to_string(key) + ", Value: " + *val + '\n';
   }
 }
 
@@ -288,17 +338,18 @@ void timeWrapper(json config) {
     logToFileAndConsole("\nConfiguration for testCase1:\n");
 
     // Retrieve the method ratios
-    int getItemRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["getItem"];
-    int addRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["add"];
-    int containsRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["contains"];
-    int removeRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["remove"];
-    int clearRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["clear"];
+    Ratio ratios;
+    ratios.getItemRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["getItem"];
+    ratios.addRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["add"];
+    ratios.containsRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["contains"];
+    ratios.removeRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["remove"];
+    ratios.clearRatio = cases["CacheManagerBenchmark"][0]["testCase1"][0]["ratioOfMethods"][0]["clear"];
     logToFileAndConsole("\tratioOfMethods: ");
-    logToFileAndConsole("\t\tgetItem: " + std::to_string(getItemRatio));
-    logToFileAndConsole("\t\tadd: " + std::to_string(addRatio));
-    logToFileAndConsole("\t\tcontains: " + std::to_string(containsRatio));
-    logToFileAndConsole("\t\tremove: " + std::to_string(removeRatio));
-    logToFileAndConsole("\t\tclear: " + std::to_string(clearRatio));
+    logToFileAndConsole("\t\tgetItem: " + std::to_string(ratios.getItemRatio));
+    logToFileAndConsole("\t\tadd: " + std::to_string(ratios.addRatio));
+    logToFileAndConsole("\t\tcontains: " + std::to_string(ratios.containsRatio));
+    logToFileAndConsole("\t\tremove: " + std::to_string(ratios.removeRatio));
+    logToFileAndConsole("\t\tclear: " + std::to_string(ratios.clearRatio));
 
     // output some helpful comments to the console
     std::cout << "\nStarting computation at " << std::ctime(&start_time);
@@ -320,9 +371,10 @@ void timeWrapper(json config) {
     for (auto key = 0; key <= testSize; ++key) {
         std::string value = "Test value for key: " + std::to_string(key);
         cm.add(key, value);
-        logToFileAndConsole("Added key: " + std::to_string(key) + "; value: '" + value + "'");
+        // logToFileAndConsole("Added key: " + std::to_string(key) + "; value: '" + value + "'");
     }
 
+    // testCacheManager(config);
 
     // output some helpful comments to the console
     // add the load time calc and output here
@@ -335,23 +387,22 @@ void timeWrapper(json config) {
     // use the same output format as in milestone2 (method, timeWrapper, is left in this example).  
     //     Add thread ID as the first column.
 
-    benchmarkCacheManager(config, testSize, 0, start);
-    // // Dispatch threads to run benchmarks
-    // const size_t numThreads{config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"]};
-    // std::vector<std::thread> threads;
-    // threads.reserve(numThreads);
-    // assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
-    //
-    // for (size_t i{0}; i < 1; i++) {
-    //     threads.emplace_back(benchmarkCacheManager, config, testSize, i, start);
-    // }
-    //
-    // // Wait until all threads are finished
-    // for (auto &t : threads) {
-    //     if (t.joinable()) {
-    //         t.join();
-    //     }
-    // }
+    // Dispatch threads to run benchmarks
+    const size_t numThreads{config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"]};
+    std::vector<std::thread> threads;
+    threads.reserve(numThreads);
+    assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
+
+    for (size_t i{0}; i < 1; i++) {
+        threads.emplace_back(benchmarkCacheManager, config, testSize, i, start, ratios, LOGGING_LEVEL::OFF);
+    }
+
+    // Wait until all threads are finished
+    for (auto &t : threads) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
 
     logToFileAndConsole("\n\n");
 
