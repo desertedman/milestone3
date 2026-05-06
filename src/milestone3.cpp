@@ -55,6 +55,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <future>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -207,6 +208,7 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   stats.min = std::min(stats.min, elapsed_seconds.count());
   stats.max = std::max(stats.max, elapsed_seconds.count());
   stats.avg += elapsed_seconds.count();
+  std::cout << stats.avg << "\n";
 }
 
 bool addItemTest(const int testSize, Stats &stats) {
@@ -315,13 +317,6 @@ MethodStats initializeStats() {
   return methodStats;
 }
 
-void calculateAverages(MethodStats &stats, int divisor) {
-  stats.getItemStats.avg /= divisor;
-  stats.addStats.avg /= divisor;
-  stats.containsStats.avg /= divisor;
-  stats.removeStats.avg /= divisor;
-}
-
 MethodStats benchmarkCacheManager(const json &config,  const int threadId,  const Ratio &ratios) {
   MethodStats methodStats = initializeStats();
 
@@ -359,6 +354,14 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
       break;
     }
 
+    // need to write out the data for each timed iteration in the following format:
+    // 
+    // threadId    end time    iter#   avg     min     max     
+    // 
+    // <threadId1> <time1>         1   1.2     0.9     1.4
+    // <threadId2> <time2>         2   1.1     0.7     1.2
+    // ...
+
     // write out the current values for this iteration
     auto curIterEnd = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
@@ -378,9 +381,6 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
 
     std::this_thread::sleep_for(std::chrono::seconds{sleepInterval});
   }
-
-  // Calculate averages for all methods
-  calculateAverages(methodStats, testIterations);
 
   return methodStats;
 }
@@ -451,14 +451,6 @@ void timeWrapper(json config) {
     // output some helpful comments to the console
     std::cout << "\nStarting computation at " << std::ctime(&start_time);
 
-    // need to write out the data for each timed iteration in the following format:
-    // 
-    // threadId    end time    iter#   avg     min     max     
-    // 
-    // <threadId1> <time1>         1   1.2     0.9     1.4
-    // <threadId2> <time2>         2   1.1     0.7     1.2
-    // ...
-
     int testSize = config["Milestone3"][0]["defaultVariables"][0]["testSize"];
     
     // Allocate the cache manager
@@ -487,7 +479,7 @@ void timeWrapper(json config) {
 
     // Dispatch threads to run benchmarks
     const size_t numThreads{config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"]};
-    std::vector<std::thread> threads;
+    std::vector<std::future<MethodStats>> threads;
     threads.reserve(numThreads);
     assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
 
@@ -496,15 +488,67 @@ void timeWrapper(json config) {
     methodStatsVector.reserve(numThreads);
 
     for (size_t i{0}; i < numThreads; i++) {
-        threads.emplace_back(benchmarkCacheManager, config, i + 1, ratios);
+        threads.emplace_back(std::async(benchmarkCacheManager, config, i + 1, ratios));
     }
 
     // Wait until all threads are finished
     for (auto &t : threads) {
-        if (t.joinable()) {
-            t.join();
-        }
+        methodStatsVector.emplace_back(t.get());
     }
+
+    // Initialize finalStats and aggregate final stats
+    MethodStats finalStats = initializeStats();
+
+    for (auto &m : methodStatsVector) {
+        finalStats.getItemStats.min = std::min(finalStats.getItemStats.min, m.getItemStats.min);
+        finalStats.addStats.min = std::min(finalStats.addStats.min, m.addStats.min);
+        finalStats.containsStats.min = std::min(finalStats.containsStats.min, m.containsStats.min);
+        finalStats.removeStats.min = std::min(finalStats.removeStats.min, m.removeStats.min);
+
+        finalStats.getItemStats.max = std::max(finalStats.getItemStats.max, m.getItemStats.max);
+        finalStats.addStats.max = std::max(finalStats.addStats.max, m.addStats.max);
+        finalStats.containsStats.max = std::max(finalStats.containsStats.max, m.containsStats.max);
+        finalStats.removeStats.max = std::max(finalStats.removeStats.max, m.removeStats.max);
+
+        finalStats.getItemStats.avg += m.getItemStats.avg;
+        finalStats.addStats.avg += m.addStats.avg;
+        finalStats.containsStats.avg += m.containsStats.avg;
+        finalStats.removeStats.avg += m.removeStats.avg;
+
+        finalStats.getItemStats.numCalls += m.getItemStats.numCalls;
+        finalStats.addStats.numCalls += m.addStats.numCalls;
+        finalStats.containsStats.numCalls += m.containsStats.numCalls;
+        finalStats.removeStats.numCalls += m.removeStats.numCalls;
+    }
+    
+    finalStats.getItemStats.avg /= finalStats.getItemStats.numCalls;
+    finalStats.addStats.avg /= finalStats.addStats.numCalls;
+    finalStats.containsStats.avg /= finalStats.containsStats.numCalls;
+    finalStats.removeStats.avg /= finalStats.removeStats.numCalls;
+
+    // Print aggregated stats
+    logToFileAndConsole("\n\n");
+    logToFileAndConsole("Method\t\tavg\t\tmin\t\tmax\t\tnumCalls");
+    logToFileAndConsole("getItem\t\t" +
+                        std::to_string(finalStats.getItemStats.avg) + "\t" +
+                        std::to_string(finalStats.getItemStats.min) + "\t" +
+                        std::to_string(finalStats.getItemStats.max) + "\t" +
+                        std::to_string(finalStats.getItemStats.numCalls));
+    logToFileAndConsole("addItem\t\t" +
+                        std::to_string(finalStats.addStats.avg) + "\t" +
+                        std::to_string(finalStats.addStats.min) + "\t" +
+                        std::to_string(finalStats.addStats.max) + "\t" +
+                        std::to_string(finalStats.addStats.numCalls));
+    logToFileAndConsole("containsItem\t" +
+                        std::to_string(finalStats.containsStats.avg) + "\t" +
+                        std::to_string(finalStats.containsStats.min) + "\t" +
+                        std::to_string(finalStats.containsStats.max) + "\t" +
+                        std::to_string(finalStats.containsStats.numCalls));
+    logToFileAndConsole("removeItem\t" +
+                        std::to_string(finalStats.removeStats.avg) + "\t" +
+                        std::to_string(finalStats.removeStats.min) + "\t" +
+                        std::to_string(finalStats.removeStats.max) + "\t" +
+                        std::to_string(finalStats.removeStats.numCalls));
 
     logToFileAndConsole("\n\n");
 
