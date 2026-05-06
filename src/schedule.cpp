@@ -3,16 +3,17 @@
 #include <random>
 
 [[nodiscard]] const std::vector<METHOD>
-Schedule::buildSchedule(const Ratio &ratio) {
+Schedule::buildSchedule(const Ratio &ratio, const int testIterations) {
   std::mt19937 gen{std::random_device{}()};
   std::uniform_int_distribution<int> distr{0, RATIO_MAX - 1};
 
   const Ratio newRatio = transformRatios(ratio);
   std::vector<METHOD> schedule;
-  schedule.reserve(RATIO_MAX);
+  schedule.reserve(testIterations);
+  assert((int)schedule.capacity() == testIterations);
   int rand{};
 
-  for (auto i{0}; i < RATIO_MAX; i++) {
+  for (auto i{0}; i < testIterations; i++) {
     rand = distr(gen);
 
     if (rand < newRatio.getItemRatio)

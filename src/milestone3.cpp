@@ -57,6 +57,7 @@
 #include "schedule.h"
 #include <future>
 #include <random>
+#include <string>
 
 using json = nlohmann::json;
 
@@ -299,14 +300,15 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
   const int testSize =
       config["Milestone3"][0]["defaultVariables"][0]["testSize"];
 
-  auto schedule = Schedule::buildSchedule(ratios);
+  auto schedule = Schedule::buildSchedule(ratios, testIterations);
+  std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
 
   double average{0}, min{300}, max{0};
   // call the specific function to time
   for (int i = 0; i < testIterations; i++) {
     auto curIterStart = std::chrono::system_clock::now();
 
-    switch (schedule[i]) {
+    switch (schedule.at(i)) {
     case METHOD::GET_ITEM:
       getItemTest(config, testSize, methodStats.getItemStats);
       break;
