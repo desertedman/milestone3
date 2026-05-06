@@ -506,6 +506,12 @@ void timeWrapper(json config) {
     printStats("contain", finalStats.containsStats);
     printStats("remove", finalStats.removeStats);
     logToFileAndConsole("clear\t\t" + std::to_string(clearTime.count()));
+    auto totalCalls = [finalStats]() {
+      return finalStats.getItemStats.numCalls + finalStats.addStats.numCalls +
+             finalStats.containsStats.numCalls +
+             finalStats.removeStats.numCalls;
+    };
+    logToFileAndConsole("Total calls: " + std::to_string(totalCalls()));
 
     logToFileAndConsole("\n\n");
 
