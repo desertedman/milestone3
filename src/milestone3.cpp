@@ -294,12 +294,11 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
 
   const int testIterations =
       config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
-  [[maybe_unused]] const int sleepInterval =
+  const int sleepInterval =
       config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"];
-  [[maybe_unused]] const int testSize =
+  const int testSize =
       config["Milestone3"][0]["defaultVariables"][0]["testSize"];
 
-  [[maybe_unused]] auto &cm = getCacheManager(); // Get cm using singleton
   auto schedule = Schedule::buildSchedule(ratios);
 
   double average{0}, min{300}, max{0};
