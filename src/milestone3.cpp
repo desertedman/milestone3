@@ -381,6 +381,7 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
                         "\t" + std::to_string(max));
     mutex.unlock();
 
+    // TODO: sleep for milliseconds?
     std::this_thread::sleep_for(std::chrono::seconds{sleepInterval});
   }
 
