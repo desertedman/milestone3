@@ -55,6 +55,7 @@
 
 #include "json.hpp"
 #include "schedule.h"
+#include <chrono>
 #include <future>
 #include <random>
 #include <string>
@@ -439,11 +440,16 @@ void timeWrapper(json config) {
 
     // sample test load of the cache
     // (0, testSize) inclusive
+
+    auto loadCacheStart = std::chrono::system_clock::now();
     for (auto key = 0; key <= testSize; ++key) {
-        std::string value = "Test value for key: " + std::to_string(key);
-        cm.add(key, value);
-        // logToFileAndConsole("Added key: " + std::to_string(key) + "; value: '" + value + "'");
+      std::string value = "Test value for key: " + std::to_string(key);
+      cm.add(key, value);
+      // logToFileAndConsole("Added key: " + std::to_string(key) + "; value:
+      // '" + value + "'");
     }
+    std::chrono::duration<double> loadCacheTime =
+        std::chrono::system_clock::now() - loadCacheStart;
 
     // write out the head line for file
     logToFileAndConsole("threadId\tend time\titer #\t\tavg\t\tmin\t\tmax\t\t");
@@ -500,6 +506,7 @@ void timeWrapper(json config) {
     printStats("contain", finalStats.containsStats);
     printStats("remove", finalStats.removeStats);
     logToFileAndConsole("clear\t\t" + std::to_string(clearTime.count()));
+    logToFileAndConsole("loadCache\t\t" + std::to_string(loadCacheTime.count()));
     auto totalCalls = [finalStats]() {
       return finalStats.getItemStats.numCalls + finalStats.addStats.numCalls +
              finalStats.containsStats.numCalls +
