@@ -97,6 +97,7 @@ struct MethodStats {
     stats.min = std::min(stats.min, seconds.count());
     stats.max = std::max(stats.max, seconds.count());
     stats.avg += seconds.count();
+    stats.numCalls++;
   }
 
   static void calculateStats(Stats &finalStats, const Stats &stats) {
@@ -309,19 +310,15 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
     switch (schedule[i]) {
     case METHOD::GET_ITEM:
       getItemTest(config, testSize, methodStats.getItemStats);
-      methodStats.getItemStats.numCalls++;
       break;
     case METHOD::ADD_ITEM:
       addItemTest(testSize, methodStats.addStats);
-      methodStats.addStats.numCalls++;
       break;
     case METHOD::CONTAINS_ITEM:
       containsItemTest(testSize, methodStats.containsStats);
-      methodStats.containsStats.numCalls++;
       break;
     case METHOD::REMOVE_ITEM:
       removeItemTest(testSize, methodStats.removeStats);
-      methodStats.removeStats.numCalls++;
       break;
     default:
       break;
@@ -469,6 +466,7 @@ void timeWrapper(json config) {
     // Initialize vector of MethodStats
     std::vector<MethodStats> methodStatsVector;
     methodStatsVector.reserve(numThreads);
+    assert(numThreads == methodStatsVector.capacity()); // Ensure methodStatsVector size is properly allocated
 
     for (size_t i{0}; i < numThreads; i++) {
         threads.emplace_back(std::async(benchmarkCacheManager, config, i + 1, ratios));
