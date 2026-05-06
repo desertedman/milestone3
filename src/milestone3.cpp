@@ -91,6 +91,15 @@ struct Stats {
 };
 
 struct MethodStats {
+  static void calculateStats(Stats &finalStats, const Stats &stats) {
+    finalStats.min = std::min(finalStats.min, stats.min);
+    finalStats.max = std::max(finalStats.max, stats.max);
+    finalStats.avg += stats.avg;
+    finalStats.numCalls += stats.numCalls;
+  }
+
+  static void calculateAverages(Stats &stats) { stats.avg /= stats.numCalls; }
+
   Stats getItemStats;
   Stats addStats;
   Stats containsStats;
@@ -371,17 +380,6 @@ void testCacheManager(const json &config) {
   }
 }
 
-void calculateStats(Stats &finalStats, const Stats &stats) {
-  finalStats.min = std::min(finalStats.min, stats.min);
-  finalStats.max = std::max(finalStats.max, stats.max);
-  finalStats.avg += stats.avg;
-  finalStats.numCalls += stats.numCalls;
-}
-
-void calculateAverages(Stats &stats) {
-  stats.avg /= stats.numCalls;
-}
-
 void printStats(std::string method, const Stats &stats) {
   logToFileAndConsole(method + "\t\t" + std::to_string(stats.avg) + "\t" +
                       std::to_string(stats.min) + "\t" +
@@ -492,16 +490,16 @@ void timeWrapper(json config) {
     MethodStats finalStats;
 
     for (const auto &m : methodStatsVector) {
-      calculateStats(finalStats.getItemStats, m.getItemStats);
-      calculateStats(finalStats.addStats, m.addStats);
-      calculateStats(finalStats.containsStats, m.containsStats);
-      calculateStats(finalStats.removeStats, m.removeStats);
+      MethodStats::calculateStats(finalStats.getItemStats, m.getItemStats);
+      MethodStats::calculateStats(finalStats.addStats, m.addStats);
+      MethodStats::calculateStats(finalStats.containsStats, m.containsStats);
+      MethodStats::calculateStats(finalStats.removeStats, m.removeStats);
     }
-    
-    calculateAverages(finalStats.getItemStats);
-    calculateAverages(finalStats.addStats);
-    calculateAverages(finalStats.containsStats);
-    calculateAverages(finalStats.removeStats);
+
+    MethodStats::calculateAverages(finalStats.getItemStats);
+    MethodStats::calculateAverages(finalStats.addStats);
+    MethodStats::calculateAverages(finalStats.containsStats);
+    MethodStats::calculateAverages(finalStats.removeStats);
 
     // Print aggregated stats
     logToFileAndConsole("\n\n");
