@@ -91,6 +91,14 @@ struct Stats {
 };
 
 struct MethodStats {
+  static void updateStats(Stats &stats,
+                          const std::chrono::duration<double> &seconds) {
+    // Update stats
+    stats.min = std::min(stats.min, seconds.count());
+    stats.max = std::max(stats.max, seconds.count());
+    stats.avg += seconds.count();
+  }
+
   static void calculateStats(Stats &finalStats, const Stats &stats) {
     finalStats.min = std::min(finalStats.min, stats.min);
     finalStats.max = std::max(finalStats.max, stats.max);
@@ -206,10 +214,7 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
 
-  // Update stats
-  stats.min = std::min(stats.min, elapsed_seconds.count());
-  stats.max = std::max(stats.max, elapsed_seconds.count());
-  stats.avg += elapsed_seconds.count();
+  MethodStats::updateStats(stats, elapsed_seconds);
 }
 
 bool addItemTest(const int testSize, Stats &stats) {
@@ -230,10 +235,7 @@ bool addItemTest(const int testSize, Stats &stats) {
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
 
-  // Update stats
-  stats.min = std::min(stats.min, elapsed_seconds.count());
-  stats.max = std::max(stats.max, elapsed_seconds.count());
-  stats.avg += elapsed_seconds.count();
+  MethodStats::updateStats(stats, elapsed_seconds);
 
   return ret;
 }
@@ -257,10 +259,7 @@ bool containsItemTest(const int testSize, Stats &stats) {
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
 
-  // Update stats
-  stats.min = std::min(stats.min, elapsed_seconds.count());
-  stats.max = std::max(stats.max, elapsed_seconds.count());
-  stats.avg += elapsed_seconds.count();
+  MethodStats::updateStats(stats, elapsed_seconds);
 
   return ret;
 }
@@ -284,10 +283,7 @@ bool removeItemTest(const int testSize, Stats &stats) {
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
 
-  // Update stats
-  stats.min = std::min(stats.min, elapsed_seconds.count());
-  stats.max = std::max(stats.max, elapsed_seconds.count());
-  stats.avg += elapsed_seconds.count();
+  MethodStats::updateStats(stats, elapsed_seconds);
 
   return ret;
 }
@@ -326,6 +322,8 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
     case METHOD::REMOVE_ITEM:
       removeItemTest(testSize, methodStats.removeStats);
       methodStats.removeStats.numCalls++;
+      break;
+    default:
       break;
     }
 
