@@ -208,7 +208,6 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   stats.min = std::min(stats.min, elapsed_seconds.count());
   stats.max = std::max(stats.max, elapsed_seconds.count());
   stats.avg += elapsed_seconds.count();
-  std::cout << stats.avg << "\n";
 }
 
 bool addItemTest(const int testSize, Stats &stats) {
@@ -374,10 +373,13 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
     max = std::max(max, elapsed_seconds.count());
     average += elapsed_seconds.count();
 
+    // Mutex lock for consistent printing
+    mutex.lock();
     logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString +
                         "\t" + std::to_string(i + 1) + "\t\t" +
                         std::to_string(average / (i + 1)) + "\t" + std::to_string(min) +
                         "\t" + std::to_string(max));
+    mutex.unlock();
 
     std::this_thread::sleep_for(std::chrono::seconds{sleepInterval});
   }
@@ -496,6 +498,11 @@ void timeWrapper(json config) {
         methodStatsVector.emplace_back(t.get());
     }
 
+    // Clear test
+    auto clearStart = std::chrono::system_clock::now();
+    cm.clear();
+    std::chrono::duration<double> clearTime = std::chrono::system_clock::now() - clearStart;
+
     // Initialize finalStats and aggregate final stats
     MethodStats finalStats = initializeStats();
 
@@ -549,6 +556,7 @@ void timeWrapper(json config) {
                         std::to_string(finalStats.removeStats.min) + "\t" +
                         std::to_string(finalStats.removeStats.max) + "\t" +
                         std::to_string(finalStats.removeStats.numCalls));
+    logToFileAndConsole("clear\t\t" + std::to_string(clearTime.count()));
 
     logToFileAndConsole("\n\n");
 

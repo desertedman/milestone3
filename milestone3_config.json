@@ -12,8 +12,8 @@
                 {
                     "testType": "static",
                     "testSize": 1000,
-                    "testIterations": 20,
-                    "degreeOfParallelism": 2,
+                    "testIterations": 50,
+                    "degreeOfParallelism": 10,
                     "sleepInterval": 0
                 }
             ]
