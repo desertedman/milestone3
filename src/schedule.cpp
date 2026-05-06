@@ -2,8 +2,8 @@
 #include <cassert>
 #include <random>
 
-const std::vector<METHOD> Schedule::buildSchedule(const Ratio &ratio) {
-
+[[nodiscard]] const std::vector<METHOD>
+Schedule::buildSchedule(const Ratio &ratio) {
   std::mt19937 gen{std::random_device{}()};
   std::uniform_int_distribution<int> distr{0, RATIO_MAX - 1};
 
@@ -32,7 +32,7 @@ const std::vector<METHOD> Schedule::buildSchedule(const Ratio &ratio) {
 }
 
 // Map ratios to a set of values 0 - 100.
-const Ratio Schedule::transformRatios(const Ratio &ratio) {
+[[nodiscard]] const Ratio Schedule::transformRatios(const Ratio &ratio) {
   int getItemRatio{ratio.getItemRatio};
   int addRatio{getItemRatio + ratio.addRatio};
   int containsRatio{addRatio + ratio.containsRatio};

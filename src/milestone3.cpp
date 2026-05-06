@@ -53,6 +53,8 @@
 #include "cache-manager.hpp"
 #include "benchmark.hpp"
 
+#include <algorithm>
+#include <climits>
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -72,6 +74,8 @@ using json = nlohmann::json;
 // Global variable to be used for logging output
 std::ofstream _outFile;
 
+std::mutex mutex;
+
 cache::CacheManager<int, std::string, bench::TbbBench> cacheManager;
 // Singleton to get cacheManager
 cache::CacheManager<int, std::string, bench::TbbBench> &getCacheManager() {
@@ -84,6 +88,20 @@ enum class LOGGING_LEVEL {
 };
 
 constexpr LOGGING_LEVEL level = LOGGING_LEVEL::OFF;
+
+struct Stats {
+  double min;
+  double max;
+  double avg;
+  int numCalls;
+};
+
+struct MethodStats {
+  Stats getItemStats;
+  Stats addStats;
+  Stats containsStats;
+  Stats removeStats;
+};
 
 /**
 *
@@ -141,6 +159,14 @@ void logToFileAndConsole(std::string message) {
     outFile << message << std::endl;  // Write to file
 }
 
+int generateRandomValue(const int min, const int max) {
+  std::random_device rd{};
+  std::mt19937 gen(rd());
+  std::uniform_int_distribution distr{min, max};
+
+  return int{distr(gen)};
+}
+
 /**
 *
 * getItemTest
@@ -151,113 +177,212 @@ void logToFileAndConsole(std::string message) {
 *
 * @return   nothing, but output is sent to console and written to output file
 */
-void getItemTest(json config, cache::CacheManager<int, std::string, bench::TbbBench> &cm, const LOGGING_LEVEL level) {
-    // sample code to retrieve and print a found entry
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution distr(1, 10);
-    int testKey = distr(gen);
-    auto val = cm.getItem(testKey);
-    logToFileAndConsole("\n\nRetrieved key: " + std::to_string(testKey) + "; with value: " + *val);
+void getItemTest(json config, const int testSize, Stats &stats) {
+  auto curIterStart = std::chrono::system_clock::now();
 
-    // try one that is not in the cache
-    testKey = testKey * 1000;
-    val = cm.getItem(testKey);
-    if (!val) {
-       logToFileAndConsole("Key: " + std::to_string(testKey) + " not found (expected)!");
-    } else {
-       logToFileAndConsole("Retrieved key: " + std::to_string(testKey) + "; with value: " + *val);
-    }
-}
-
-void getItemTest2(const json config, cache::CacheManager<int, std::string, bench::TbbBench> &cm, const int testSize) {
-  // Setup random key generation
-  std::random_device rd{};
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution newDistr{
-      testSize + 1, INT_MAX}; // Generate random key > testSize
-  std::uniform_int_distribution existingDistr{
-      1, testSize}; // Generate random key 1 - testSize
-
-  int newKey{newDistr(gen)};
-  int existingKey{existingDistr(gen)}; // (1, testSize)
-
-  // Try key that is in cache
-  auto val{cm.getItem(existingKey)};
-  logToFileAndConsole("key: " + std::to_string(existingKey) + ", value: " + *val);
-
-  // Try key not in cache
-  val = cm.getItem(newKey);
-  logToFileAndConsole("key: " + std::to_string(newKey) + ", value: " + *val);
-}
-
-int generateRandomValue(const int min, const int max) {
-  std::random_device rd{};
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution distr{min, max};
-
-  return int{distr(gen)};
-}
-
-bool addItemTest(const int key, const int min, const int max) {
   auto &cm = getCacheManager();
-  int newKey{};
+  int testKey = generateRandomValue(0, testSize);
+
+  if (generateRandomValue(1, 2) == 1) {
+    // Generate new key
+    testKey *= 1000;
+  }
+
+  mutex.lock();
+  auto val = cm.getItem(testKey);
+  if (level == LOGGING_LEVEL::ON) {
+    if (val)
+      logToFileAndConsole("\n\nRetrieved key: " + std::to_string(testKey) +
+                          "; with value: " + *val);
+
+    else
+      logToFileAndConsole("\n\nKey: " + std::to_string(testKey) + " not found");
+  }
+  mutex.unlock();
+
+  auto curIterEnd = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
+
+  // Update stats
+  stats.min = std::min(stats.min, elapsed_seconds.count());
+  stats.max = std::max(stats.max, elapsed_seconds.count());
+  stats.avg += elapsed_seconds.count();
+}
+
+bool addItemTest(const int testSize, Stats &stats) {
+  auto curIterStart = std::chrono::system_clock::now();
+
+  auto &cm = getCacheManager();
   bool ret{};
+  int testKey{generateRandomValue(testSize + 1, INT_MAX)};
 
-  // Check if cache contains newKey (should not!)
-  do {
-    // Generate newKey
-    newKey = key;
-
-    ret = cm.contains(newKey);
-    if (ret != false && level == LOGGING_LEVEL::ON) {
-      std::cout << "ALERT:\t\tnewKey already added! Generating new key...\n";
-    }
-  } while (ret != false); // Validate that newKey has not already been added
-
-  // Add newKey and value to cache
-  std::string value = "Test value for key: " + std::to_string(newKey);
-  ret = cm.add(newKey, value);
+  std::string value = "Test value for key: " + std::to_string(testKey);
+  mutex.lock();
+  ret = cm.add(testKey, value);
   if (level == LOGGING_LEVEL::ON)
-    std::cout << "\t\tAdded: " + std::to_string(newKey) +
-                     ", Value: " + *cm.getItem(newKey) + "\n";
+    std::cout << "\t\tAdded: " + std::to_string(testKey) +
+                     ", Value: " + *cm.getItem(testKey) + "\n";
+  mutex.unlock();
+
+  auto curIterEnd = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
+
+  // Update stats
+  stats.min = std::min(stats.min, elapsed_seconds.count());
+  stats.max = std::max(stats.max, elapsed_seconds.count());
+  stats.avg += elapsed_seconds.count();
 
   return ret;
 }
 
-void benchmarkCacheManager(const json &config, const int testSize, const int threadId, const std::chrono::system_clock::time_point &start, const Ratio &ratios) {
-  // auto &cm = getCacheManager(); // Get cm using singleton
+bool containsItemTest(const int testSize, Stats &stats) {
+  auto curIterStart = std::chrono::system_clock::now();
+
+  auto &cm = getCacheManager();
+  bool ret{};
+  int testKey{generateRandomValue(0, testSize)};
+
+  if (generateRandomValue(1, 2) == 1) {
+    // Generate new key
+    testKey *= 1000;
+  }
+
+  mutex.lock();
+  ret = cm.contains(testKey);
+  mutex.unlock();
+
+  auto curIterEnd = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
+
+  // Update stats
+  stats.min = std::min(stats.min, elapsed_seconds.count());
+  stats.max = std::max(stats.max, elapsed_seconds.count());
+  stats.avg += elapsed_seconds.count();
+
+  return ret;
+}
+
+bool removeItemTest(const int testSize, Stats &stats) {
+  auto curIterStart = std::chrono::system_clock::now();
+
+  auto &cm = getCacheManager();
+  bool ret{};
+  int testKey{generateRandomValue(0, testSize)};
+
+  // if (generateRandomValue(1, 2) == 1) {
+  //   // Generate new key
+  //   testKey *= 1000;
+  // }
+
+  mutex.lock();
+  ret = cm.remove(testKey);
+  mutex.unlock();
+
+  auto curIterEnd = std::chrono::system_clock::now();
+  std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
+
+  // Update stats
+  stats.min = std::min(stats.min, elapsed_seconds.count());
+  stats.max = std::max(stats.max, elapsed_seconds.count());
+  stats.avg += elapsed_seconds.count();
+
+  return ret;
+}
+
+MethodStats initializeStats() {
+  MethodStats methodStats;
+
+  methodStats.getItemStats.numCalls = 0;
+  methodStats.getItemStats.min = 300.;
+  methodStats.getItemStats.max = 0;
+  methodStats.getItemStats.avg = 0;
+
+  methodStats.addStats.numCalls = 0;
+  methodStats.addStats.min = 300.;
+  methodStats.addStats.max = 0;
+  methodStats.addStats.avg = 0;
+
+  methodStats.containsStats.numCalls = 0;
+  methodStats.containsStats.min = 300.;
+  methodStats.containsStats.max = 0;
+  methodStats.containsStats.avg = 0;
+
+  methodStats.removeStats.numCalls = 0;
+  methodStats.removeStats.min = 300.;
+  methodStats.removeStats.max = 0;
+  methodStats.removeStats.avg = 0;
+
+  return methodStats;
+}
+
+void calculateAverages(MethodStats &stats, int divisor) {
+  stats.getItemStats.avg /= divisor;
+  stats.addStats.avg /= divisor;
+  stats.containsStats.avg /= divisor;
+  stats.removeStats.avg /= divisor;
+}
+
+MethodStats benchmarkCacheManager(const json &config,  const int threadId,  const Ratio &ratios) {
+  MethodStats methodStats = initializeStats();
+
+  const int testIterations =
+      config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
+  [[maybe_unused]] const int sleepInterval =
+      config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"];
+  [[maybe_unused]] const int testSize =
+      config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+
+  [[maybe_unused]] auto &cm = getCacheManager(); // Get cm using singleton
   auto schedule = Schedule::buildSchedule(ratios);
 
+  double average{0}, min{300}, max{0};
   // call the specific function to time
-  for (int i = 0; i < 10; i++) {
-    float average{0.f}, min{0.f}, max{0.f};
+  for (int i = 0; i < testIterations; i++) {
+    auto curIterStart = std::chrono::system_clock::now();
 
     switch (schedule[i]) {
     case METHOD::GET_ITEM:
+      getItemTest(config, testSize, methodStats.getItemStats);
+      methodStats.getItemStats.numCalls++;
       break;
     case METHOD::ADD_ITEM:
+      addItemTest(testSize, methodStats.addStats);
+      methodStats.addStats.numCalls++;
       break;
     case METHOD::CONTAINS_ITEM:
+      containsItemTest(testSize, methodStats.containsStats);
+      methodStats.containsStats.numCalls++;
       break;
     case METHOD::REMOVE_ITEM:
+      removeItemTest(testSize, methodStats.removeStats);
+      methodStats.removeStats.numCalls++;
       break;
     }
 
-    // TODO: Insert sleep here...
-
     // write out the current values for this iteration
     auto curIterEnd = std::chrono::system_clock::now();
-    std::chrono::duration<double> elapsed_seconds = curIterEnd - start;
-    // std::time_t iterEndTime =
-    // std::chrono::system_clock::to_time_t(curIterEnd);
-    std::string timeString = "00:00:00";
+    std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
+
+    std::string timeString = std::format(
+        "{:%H:%M:%S}",
+        std::chrono::time_point_cast<std::chrono::seconds>(curIterEnd));
+
+    min = std::min(min, elapsed_seconds.count());
+    max = std::max(max, elapsed_seconds.count());
+    average += elapsed_seconds.count();
 
     logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString +
-                        "\t" + std::to_string(i) + "\t\t" +
-                        std::to_string(average) + "\t" + std::to_string(min) +
+                        "\t" + std::to_string(i + 1) + "\t\t" +
+                        std::to_string(average / (i + 1)) + "\t" + std::to_string(min) +
                         "\t" + std::to_string(max));
+
+    std::this_thread::sleep_for(std::chrono::seconds{sleepInterval});
   }
+
+  // Calculate averages for all methods
+  calculateAverages(methodStats, testIterations);
+
+  return methodStats;
 }
 
 void testCacheManager(const json &config) {
@@ -340,6 +465,7 @@ void timeWrapper(json config) {
     auto &cm = getCacheManager(); // Get cm using singleton
 
     // sample test load of the cache
+    // (0, testSize) inclusive
     for (auto key = 0; key <= testSize; ++key) {
         std::string value = "Test value for key: " + std::to_string(key);
         cm.add(key, value);
@@ -365,8 +491,12 @@ void timeWrapper(json config) {
     threads.reserve(numThreads);
     assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
 
-    for (size_t i{0}; i < 1; i++) {
-        threads.emplace_back(benchmarkCacheManager, config, testSize, i, start, ratios);
+    // Initialize vector of MethodStats
+    std::vector<MethodStats> methodStatsVector;
+    methodStatsVector.reserve(numThreads);
+
+    for (size_t i{0}; i < numThreads; i++) {
+        threads.emplace_back(benchmarkCacheManager, config, i + 1, ratios);
     }
 
     // Wait until all threads are finished
