@@ -404,6 +404,23 @@ void testCacheManager(const json &config) {
   }
 }
 
+void calculateStats(Stats &finalStats, const Stats &stats) {
+  finalStats.min = std::min(finalStats.min, stats.min);
+  finalStats.max = std::max(finalStats.max, stats.max);
+  finalStats.avg += stats.avg;
+  finalStats.numCalls += stats.numCalls;
+}
+
+void calculateAverages(Stats &stats) {
+  stats.avg /= stats.numCalls;
+}
+
+void printStats(std::string method, const Stats &stats) {
+  logToFileAndConsole(method + "\t\t" + std::to_string(stats.avg) + "\t" +
+                      std::to_string(stats.min) + "\t" +
+                      std::to_string(stats.max) + "\t" +
+                      std::to_string(stats.numCalls));
+}
 /**
 *
 * timeWrapper
@@ -508,55 +525,24 @@ void timeWrapper(json config) {
     MethodStats finalStats = initializeStats();
 
     for (auto &m : methodStatsVector) {
-        finalStats.getItemStats.min = std::min(finalStats.getItemStats.min, m.getItemStats.min);
-        finalStats.addStats.min = std::min(finalStats.addStats.min, m.addStats.min);
-        finalStats.containsStats.min = std::min(finalStats.containsStats.min, m.containsStats.min);
-        finalStats.removeStats.min = std::min(finalStats.removeStats.min, m.removeStats.min);
-
-        finalStats.getItemStats.max = std::max(finalStats.getItemStats.max, m.getItemStats.max);
-        finalStats.addStats.max = std::max(finalStats.addStats.max, m.addStats.max);
-        finalStats.containsStats.max = std::max(finalStats.containsStats.max, m.containsStats.max);
-        finalStats.removeStats.max = std::max(finalStats.removeStats.max, m.removeStats.max);
-
-        finalStats.getItemStats.avg += m.getItemStats.avg;
-        finalStats.addStats.avg += m.addStats.avg;
-        finalStats.containsStats.avg += m.containsStats.avg;
-        finalStats.removeStats.avg += m.removeStats.avg;
-
-        finalStats.getItemStats.numCalls += m.getItemStats.numCalls;
-        finalStats.addStats.numCalls += m.addStats.numCalls;
-        finalStats.containsStats.numCalls += m.containsStats.numCalls;
-        finalStats.removeStats.numCalls += m.removeStats.numCalls;
+      calculateStats(finalStats.getItemStats, m.getItemStats);
+      calculateStats(finalStats.addStats, m.addStats);
+      calculateStats(finalStats.containsStats, m.containsStats);
+      calculateStats(finalStats.removeStats, m.removeStats);
     }
     
-    finalStats.getItemStats.avg /= finalStats.getItemStats.numCalls;
-    finalStats.addStats.avg /= finalStats.addStats.numCalls;
-    finalStats.containsStats.avg /= finalStats.containsStats.numCalls;
-    finalStats.removeStats.avg /= finalStats.removeStats.numCalls;
+    calculateAverages(finalStats.getItemStats);
+    calculateAverages(finalStats.addStats);
+    calculateAverages(finalStats.containsStats);
+    calculateAverages(finalStats.removeStats);
 
     // Print aggregated stats
     logToFileAndConsole("\n\n");
     logToFileAndConsole("Method\t\tavg\t\tmin\t\tmax\t\tnumCalls");
-    logToFileAndConsole("getItem\t\t" +
-                        std::to_string(finalStats.getItemStats.avg) + "\t" +
-                        std::to_string(finalStats.getItemStats.min) + "\t" +
-                        std::to_string(finalStats.getItemStats.max) + "\t" +
-                        std::to_string(finalStats.getItemStats.numCalls));
-    logToFileAndConsole("addItem\t\t" +
-                        std::to_string(finalStats.addStats.avg) + "\t" +
-                        std::to_string(finalStats.addStats.min) + "\t" +
-                        std::to_string(finalStats.addStats.max) + "\t" +
-                        std::to_string(finalStats.addStats.numCalls));
-    logToFileAndConsole("containsItem\t" +
-                        std::to_string(finalStats.containsStats.avg) + "\t" +
-                        std::to_string(finalStats.containsStats.min) + "\t" +
-                        std::to_string(finalStats.containsStats.max) + "\t" +
-                        std::to_string(finalStats.containsStats.numCalls));
-    logToFileAndConsole("removeItem\t" +
-                        std::to_string(finalStats.removeStats.avg) + "\t" +
-                        std::to_string(finalStats.removeStats.min) + "\t" +
-                        std::to_string(finalStats.removeStats.max) + "\t" +
-                        std::to_string(finalStats.removeStats.numCalls));
+    printStats("getItem", finalStats.getItemStats);
+    printStats("addItem", finalStats.addStats);
+    printStats("contain", finalStats.containsStats);
+    printStats("remove", finalStats.removeStats);
     logToFileAndConsole("clear\t\t" + std::to_string(clearTime.count()));
 
     logToFileAndConsole("\n\n");
