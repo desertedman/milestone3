@@ -301,7 +301,7 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
       config["Milestone3"][0]["defaultVariables"][0]["testSize"];
 
   auto schedule = Schedule::buildSchedule(ratios, testIterations);
-  std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
+  // std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
 
   double average{0}, min{300}, max{0};
   // call the specific function to time
@@ -444,12 +444,6 @@ void timeWrapper(json config) {
         cm.add(key, value);
         // logToFileAndConsole("Added key: " + std::to_string(key) + "; value: '" + value + "'");
     }
-
-    // testCacheManager(config);
-
-    // output some helpful comments to the console
-    // add the load time calc and output here
-    std::cout << "Starting computation at " << std::ctime(&start_time);
 
     // write out the head line for file
     logToFileAndConsole("threadId\tend time\titer #\t\tavg\t\tmin\t\tmax\t\t");
