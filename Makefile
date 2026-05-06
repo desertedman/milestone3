@@ -7,7 +7,7 @@ OBJ = $(wildcard lib/*)
 
 # Your application
 milestone3: src/milestone3.cpp $(OBJ)
-	$(CXX) $(CXXFLAGS) $(INCLUDES) src/milestone3.cpp $(OBJ) $(LIBS) -o milestone3
+	$(CXX) $(CXXFLAGS) $(INCLUDES) src/milestone3.cpp src/schedule.cpp $(OBJ) $(LIBS) -o milestone3
 
 clean:
 	rm -f milestone3
