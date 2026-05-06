@@ -14,11 +14,12 @@ enum class METHOD {
   ADD_ITEM,
   CONTAINS_ITEM,
   REMOVE_ITEM,
+  NUM_METHODS, // 4 methods
 };
 
 constexpr int RATIO_MAX = 100;
 
 namespace Schedule {
-[[nodiscard]] const std::vector<METHOD> buildSchedule(const Ratio &ratio);
+[[nodiscard]] const std::vector<METHOD> buildSchedule(const Ratio &ratio, const int testIterations);
 [[nodiscard]] const Ratio transformRatios(const Ratio &ratio);
 } // namespace Schedule
