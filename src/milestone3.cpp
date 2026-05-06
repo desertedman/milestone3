@@ -53,18 +53,10 @@
 #include "cache-manager.hpp"
 #include "benchmark.hpp"
 
-#include <algorithm>
-#include <climits>
-#include <future>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <chrono>
-#include <random>
-#include <thread>
-
 #include "json.hpp"
 #include "schedule.h"
+#include <future>
+#include <random>
 
 using json = nlohmann::json;
 
@@ -91,7 +83,8 @@ enum class LOGGING_LEVEL {
 constexpr LOGGING_LEVEL level = LOGGING_LEVEL::OFF;
 
 struct Stats {
-  double min;
+  Stats() : min{300.}, max{0.}, avg{0.}, numCalls{0} {}
+  double min; // Initialize min to arbitrary large number
   double max;
   double avg;
   int numCalls;
@@ -290,34 +283,8 @@ bool removeItemTest(const int testSize, Stats &stats) {
   return ret;
 }
 
-MethodStats initializeStats() {
-  MethodStats methodStats;
-
-  methodStats.getItemStats.numCalls = 0;
-  methodStats.getItemStats.min = 300.;
-  methodStats.getItemStats.max = 0;
-  methodStats.getItemStats.avg = 0;
-
-  methodStats.addStats.numCalls = 0;
-  methodStats.addStats.min = 300.;
-  methodStats.addStats.max = 0;
-  methodStats.addStats.avg = 0;
-
-  methodStats.containsStats.numCalls = 0;
-  methodStats.containsStats.min = 300.;
-  methodStats.containsStats.max = 0;
-  methodStats.containsStats.avg = 0;
-
-  methodStats.removeStats.numCalls = 0;
-  methodStats.removeStats.min = 300.;
-  methodStats.removeStats.max = 0;
-  methodStats.removeStats.avg = 0;
-
-  return methodStats;
-}
-
 MethodStats benchmarkCacheManager(const json &config,  const int threadId,  const Ratio &ratios) {
-  MethodStats methodStats = initializeStats();
+  MethodStats methodStats;
 
   const int testIterations =
       config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
@@ -522,9 +489,9 @@ void timeWrapper(json config) {
     std::chrono::duration<double> clearTime = std::chrono::system_clock::now() - clearStart;
 
     // Initialize finalStats and aggregate final stats
-    MethodStats finalStats = initializeStats();
+    MethodStats finalStats;
 
-    for (auto &m : methodStatsVector) {
+    for (const auto &m : methodStatsVector) {
       calculateStats(finalStats.getItemStats, m.getItemStats);
       calculateStats(finalStats.addStats, m.addStats);
       calculateStats(finalStats.containsStats, m.containsStats);
