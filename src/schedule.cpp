@@ -1,6 +1,7 @@
 #include "schedule.h"
 #include <cassert>
 #include <random>
+#include <vector>
 
 [[nodiscard]] const std::vector<METHOD>
 Schedule::buildSchedule(const Ratio &ratio, const int testIterations) {
@@ -28,6 +29,17 @@ Schedule::buildSchedule(const Ratio &ratio, const int testIterations) {
     else
       schedule.emplace_back(METHOD::REMOVE_ITEM);
   }
+
+  return schedule;
+}
+
+[[nodiscard]] const std::vector<METHOD> buildSchedule(const METHOD method, const int testIterations) {
+  std::vector<METHOD> schedule;
+  schedule.reserve(testIterations);
+  assert((int)schedule.capacity() == testIterations);
+
+  for (auto i{0}; i < testIterations; i++)
+    schedule.emplace_back(method);
 
   return schedule;
 }

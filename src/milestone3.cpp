@@ -296,8 +296,8 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
 
   const int testIterations =
       config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
-  const int sleepInterval =
-      config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"];
+  const double sleepIntervalMs =
+      static_cast<double>(config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"]) * 1000.f;
   const int testSize =
       config["Milestone3"][0]["defaultVariables"][0]["testSize"];
 
@@ -354,8 +354,7 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
                         "\t" + std::to_string(max));
     mutex.unlock();
 
-    // TODO: sleep for milliseconds?
-    std::this_thread::sleep_for(std::chrono::seconds{sleepInterval});
+    std::this_thread::sleep_for(std::chrono::duration<double, std::milli>{sleepIntervalMs});
   }
 
   return methodStats;
