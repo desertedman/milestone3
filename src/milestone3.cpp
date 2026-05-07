@@ -72,7 +72,8 @@ std::ofstream _outFile;
 
 std::mutex printMutex;
 std::mutex mutex;
-std::atomic_int counter = 0;
+std::atomic_int counter{0};
+std::atomic<double> atomicAvg{0}, atomicMin{300.}, atomicMax{0};
 
 cache::CacheManager<int, std::string, bench::TbbBench> cacheManager;
 // Singleton to get cacheManager
@@ -170,11 +171,13 @@ void setOutFile(const std::string& filePath) {
  * @param message The message to log
  */
 void logToFileAndConsole(std::string message) {
+    printMutex.lock();
     // Get the output file
     std::ofstream& outFile = getOutFile();
 
     std::cout << message << std::endl;  // Print to console 
     outFile << message << std::endl;  // Write to file
+    printMutex.unlock();
 }
 
 int generateRandomValue(const int min, const int max) {
@@ -199,7 +202,7 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   auto curIterStart = std::chrono::system_clock::now();
 
   auto &cm = getCacheManager();
-  int testKey = generateRandomValue(0, testSize);
+  int testKey = generateRandomValue(1, testSize);
 
   // if (generateRandomValue(1, 2) == 1) {
   //   // Generate new key
@@ -313,10 +316,11 @@ MethodStats benchmarkCacheManager(const json &config, const int threadId,
   auto schedule = Schedule::buildSchedule(ratios, testIterations);
   // std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
 
-  double average{0}, min{300}, max{0};
+  [[maybe_unused]] double average{0}, min{300}, max{0};
   // call the specific function to time
   while (true) {
     // Make loop thread safe
+    // i starts at 0
     int i = counter.fetch_add(1);
     if (i >= testIterations)
       break;
@@ -357,17 +361,15 @@ MethodStats benchmarkCacheManager(const json &config, const int threadId,
         "{:%H:%M:%S}",
         std::chrono::time_point_cast<std::chrono::seconds>(curIterEnd));
 
-    min = std::min(min, elapsed_seconds.count());
-    max = std::max(max, elapsed_seconds.count());
-    average += elapsed_seconds.count();
+    atomicMin = std::min(static_cast<double>(atomicMin), elapsed_seconds.count());
+    atomicMax = std::max(static_cast<double>(atomicMax), elapsed_seconds.count());
+    atomicAvg += elapsed_seconds.count();
 
     // Mutex lock for consistent printing
-    printMutex.lock();
     logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString + "\t" +
                         std::to_string(i + 1) + "\t\t" +
-                        std::to_string(average / (i + 1)) + "\t" +
-                        std::to_string(min) + "\t" + std::to_string(max));
-    printMutex.unlock();
+                        std::to_string(atomicAvg / (i + 1)) + "\t" +
+                        std::to_string(atomicMin) + "\t" + std::to_string(atomicMax));
 
     std::this_thread::sleep_for(
         std::chrono::duration<double, std::milli>{sleepIntervalMs});

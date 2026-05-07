@@ -20,7 +20,9 @@ enum class METHOD {
 constexpr int RATIO_MAX = 100;
 
 namespace Schedule {
-[[nodiscard]] const std::vector<METHOD> buildSchedule(const Ratio &ratio, const int testIterations);
-[[nodiscard]] const std::vector<METHOD> buildSchedule(const METHOD method, const int testIterations);
+[[nodiscard]] const std::vector<METHOD> buildSchedule(const Ratio &ratio,
+                                                      const int testIterations);
+[[nodiscard]] const std::vector<METHOD> buildSchedule(const METHOD method,
+                                                      const int testIterations);
 [[nodiscard]] const Ratio transformRatios(const Ratio &ratio);
 } // namespace Schedule

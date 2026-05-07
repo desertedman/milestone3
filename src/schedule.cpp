@@ -33,7 +33,8 @@ Schedule::buildSchedule(const Ratio &ratio, const int testIterations) {
   return schedule;
 }
 
-[[nodiscard]] const std::vector<METHOD> Schedule::buildSchedule(METHOD method, const int testIterations) {
+[[nodiscard]] const std::vector<METHOD>
+Schedule::buildSchedule(const METHOD method, const int testIterations) {
   std::vector<METHOD> schedule;
   schedule.reserve(testIterations);
   assert((int)schedule.capacity() == testIterations);
