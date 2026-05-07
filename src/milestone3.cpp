@@ -207,7 +207,7 @@ int generateRandomValue(const int min, const int max) {
 *
 * @return   nothing, but output is sent to console and written to output file
 */
-void getItemTest(json config, const int testSize, Stats &stats) {
+void getItemTest(json config, const int testSize, Stats &stats, const int shouldLock = 0) {
   auto curIterStart = std::chrono::system_clock::now();
 
   auto &cm = getCacheManager();
@@ -218,7 +218,8 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   //   testKey *= 1000;
   // }
 
-  mutex.lock();
+  if (shouldLock)
+    mutex.lock();
   auto val = cm.getItem(testKey);
   if (level == LOGGING_LEVEL::ON) {
     if (val)
@@ -228,7 +229,8 @@ void getItemTest(json config, const int testSize, Stats &stats) {
     else
       logToFileAndConsole("\n\nKey: " + std::to_string(testKey) + " not found");
   }
-  mutex.unlock();
+  if (shouldLock)
+    mutex.unlock();
 
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
@@ -236,7 +238,7 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   MethodStats::updateStats(stats, elapsed_seconds);
 }
 
-bool addItemTest(const int testSize, Stats &stats) {
+bool addItemTest(const int testSize, Stats &stats, const int shouldLock = 0) {
   auto curIterStart = std::chrono::system_clock::now();
 
   auto &cm = getCacheManager();
@@ -244,12 +246,15 @@ bool addItemTest(const int testSize, Stats &stats) {
   int testKey{generateRandomValue(testSize + 1, INT_MAX)};
 
   std::string value = "Test value for key: " + std::to_string(testKey);
-  mutex.lock();
+  if (shouldLock)
+    mutex.lock();
   ret = cm.add(testKey, value);
+  assert(ret == true); // Ensure adds are successful
   if (level == LOGGING_LEVEL::ON)
     std::cout << "\t\tAdded: " + std::to_string(testKey) +
                      ", Value: " + *cm.getItem(testKey) + "\n";
-  mutex.unlock();
+  if (shouldLock)
+    mutex.unlock();
 
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
@@ -259,7 +264,7 @@ bool addItemTest(const int testSize, Stats &stats) {
   return ret;
 }
 
-bool containsItemTest(const int testSize, Stats &stats) {
+bool containsItemTest(const int testSize, Stats &stats, const int shouldLock = 0) {
   auto curIterStart = std::chrono::system_clock::now();
 
   auto &cm = getCacheManager();
@@ -271,9 +276,11 @@ bool containsItemTest(const int testSize, Stats &stats) {
     testKey *= 1000;
   }
 
-  mutex.lock();
+  if (shouldLock)
+    mutex.lock();
   ret = cm.contains(testKey);
-  mutex.unlock();
+  if (shouldLock)
+    mutex.unlock();
 
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
@@ -283,7 +290,7 @@ bool containsItemTest(const int testSize, Stats &stats) {
   return ret;
 }
 
-bool removeItemTest(const int testSize, Stats &stats) {
+bool removeItemTest(const int testSize, Stats &stats, const int shouldLock = 0) {
   auto curIterStart = std::chrono::system_clock::now();
 
   auto &cm = getCacheManager();
@@ -295,9 +302,11 @@ bool removeItemTest(const int testSize, Stats &stats) {
   //   testKey *= 1000;
   // }
 
-  mutex.lock();
+  if (shouldLock)
+    mutex.lock();
   ret = cm.remove(testKey);
-  mutex.unlock();
+  if (shouldLock)
+    mutex.unlock();
 
   auto curIterEnd = std::chrono::system_clock::now();
   std::chrono::duration<double> elapsed_seconds = curIterEnd - curIterStart;
@@ -321,6 +330,7 @@ MethodStats benchmarkCacheManager(const json &config, const int threadId,
       config["Milestone3"][0][mode][0]["degreeOfParallelism"];
   const int testIterations =
       config["Milestone3"][0][mode][0]["testIterations"];
+  const int shouldLock = config["Milestone3"][0]["overwriteVariables"][0]["shouldLock"];
 
   auto schedule = Schedule::buildSchedule(ratios, testIterations);
   // std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
@@ -338,16 +348,16 @@ MethodStats benchmarkCacheManager(const json &config, const int threadId,
 
     switch (schedule.at(i)) {
     case METHOD::GET_ITEM:
-      getItemTest(config, testSize, methodStats.getItemStats);
+      getItemTest(config, testSize, methodStats.getItemStats, shouldLock);
       break;
     case METHOD::ADD_ITEM:
-      addItemTest(testSize, methodStats.addStats);
+      addItemTest(testSize, methodStats.addStats, shouldLock);
       break;
     case METHOD::CONTAINS_ITEM:
-      containsItemTest(testSize, methodStats.containsStats);
+      containsItemTest(testSize, methodStats.containsStats, shouldLock);
       break;
     case METHOD::REMOVE_ITEM:
-      removeItemTest(testSize, methodStats.removeStats);
+      removeItemTest(testSize, methodStats.removeStats, shouldLock);
       break;
     default:
       break;
@@ -459,7 +469,7 @@ void timeWrapper(json config, const std::string &mode) {
     // output some helpful comments to the console
     std::cout << "\nStarting computation at " << std::ctime(&start_time);
 
-    int testSize = config["Milestone3"][0][mode][0]["testSize"];
+    [[maybe_unused]] int testSize = config["Milestone3"][0][mode][0]["testSize"];
     
     // Allocate the cache manager
     auto &cm = getCacheManager(); // Get cm using singleton
