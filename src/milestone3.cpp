@@ -55,6 +55,7 @@
 
 #include "json.hpp"
 #include "schedule.h"
+#include <atomic>
 #include <chrono>
 #include <future>
 #include <random>
@@ -69,13 +70,16 @@ using json = nlohmann::json;
 // Global variable to be used for logging output
 std::ofstream _outFile;
 
+std::mutex printMutex;
 std::mutex mutex;
+std::atomic_int counter = 0;
 
 cache::CacheManager<int, std::string, bench::TbbBench> cacheManager;
 // Singleton to get cacheManager
 cache::CacheManager<int, std::string, bench::TbbBench> &getCacheManager() {
   return cacheManager;
 }
+
 
 enum class LOGGING_LEVEL {
   ON,
@@ -197,10 +201,10 @@ void getItemTest(json config, const int testSize, Stats &stats) {
   auto &cm = getCacheManager();
   int testKey = generateRandomValue(0, testSize);
 
-  if (generateRandomValue(1, 2) == 1) {
-    // Generate new key
-    testKey *= 1000;
-  }
+  // if (generateRandomValue(1, 2) == 1) {
+  //   // Generate new key
+  //   testKey *= 1000;
+  // }
 
   mutex.lock();
   auto val = cm.getItem(testKey);
@@ -248,7 +252,7 @@ bool containsItemTest(const int testSize, Stats &stats) {
 
   auto &cm = getCacheManager();
   bool ret{};
-  int testKey{generateRandomValue(0, testSize)};
+  int testKey{generateRandomValue(1, testSize)};
 
   if (generateRandomValue(1, 2) == 1) {
     // Generate new key
@@ -272,7 +276,7 @@ bool removeItemTest(const int testSize, Stats &stats) {
 
   auto &cm = getCacheManager();
   bool ret{};
-  int testKey{generateRandomValue(0, testSize)};
+  int testKey{generateRandomValue(1, testSize)};
 
   // if (generateRandomValue(1, 2) == 1) {
   //   // Generate new key
@@ -291,22 +295,32 @@ bool removeItemTest(const int testSize, Stats &stats) {
   return ret;
 }
 
-MethodStats benchmarkCacheManager(const json &config,  const int threadId,  const Ratio &ratios) {
+MethodStats benchmarkCacheManager(const json &config, const int threadId,
+                                  const Ratio &ratios) {
   MethodStats methodStats;
 
-  const int testIterations =
-      config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
   const double sleepIntervalMs =
-      static_cast<double>(config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"]) * 1000.f;
+      static_cast<double>(
+          config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"]) *
+      1000.f;
   const int testSize =
       config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+  [[maybe_unused]] const int degreeOfParallelism =
+      config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"];
+  const int testIterations =
+      config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
 
   auto schedule = Schedule::buildSchedule(ratios, testIterations);
   // std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
 
   double average{0}, min{300}, max{0};
   // call the specific function to time
-  for (int i = 0; i < testIterations; i++) {
+  while (true) {
+    // Make loop thread safe
+    int i = counter.fetch_add(1);
+    if (i >= testIterations)
+      break;
+
     auto curIterStart = std::chrono::system_clock::now();
 
     switch (schedule.at(i)) {
@@ -326,10 +340,11 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
       break;
     }
 
-    // need to write out the data for each timed iteration in the following format:
-    // 
-    // threadId    end time    iter#   avg     min     max     
-    // 
+    // need to write out the data for each timed iteration in the following
+    // format:
+    //
+    // threadId    end time    iter#   avg     min     max
+    //
     // <threadId1> <time1>         1   1.2     0.9     1.4
     // <threadId2> <time2>         2   1.1     0.7     1.2
     // ...
@@ -347,14 +362,15 @@ MethodStats benchmarkCacheManager(const json &config,  const int threadId,  cons
     average += elapsed_seconds.count();
 
     // Mutex lock for consistent printing
-    mutex.lock();
-    logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString +
-                        "\t" + std::to_string(i + 1) + "\t\t" +
-                        std::to_string(average / (i + 1)) + "\t" + std::to_string(min) +
-                        "\t" + std::to_string(max));
-    mutex.unlock();
+    printMutex.lock();
+    logToFileAndConsole(std::to_string(threadId) + "\t\t" + timeString + "\t" +
+                        std::to_string(i + 1) + "\t\t" +
+                        std::to_string(average / (i + 1)) + "\t" +
+                        std::to_string(min) + "\t" + std::to_string(max));
+    printMutex.unlock();
 
-    std::this_thread::sleep_for(std::chrono::duration<double, std::milli>{sleepIntervalMs});
+    std::this_thread::sleep_for(
+        std::chrono::duration<double, std::milli>{sleepIntervalMs});
   }
 
   return methodStats;
@@ -438,10 +454,9 @@ void timeWrapper(json config) {
     auto &cm = getCacheManager(); // Get cm using singleton
 
     // sample test load of the cache
-    // (0, testSize) inclusive
-
+    // (1, testSize) inclusive
     auto loadCacheStart = std::chrono::system_clock::now();
-    for (auto key = 0; key <= testSize; ++key) {
+    for (auto key = 1; key <= testSize; ++key) {
       std::string value = "Test value for key: " + std::to_string(key);
       cm.add(key, value);
       // logToFileAndConsole("Added key: " + std::to_string(key) + "; value:
