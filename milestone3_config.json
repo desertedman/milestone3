@@ -8,13 +8,22 @@
                     "errorLogFile": "logFile.txt"
                 }
             ],
+            "overwriteVariables": [
+                {
+                    "testType": "dynamic",
+                    "testSize": 1000,
+                    "testIterations": 2000,
+                    "degreeOfParallelism": 2,
+                    "sleepInterval": 0
+                }
+            ],
             "defaultVariables": [
                 {
                     "testType": "static",
                     "testSize": 10,
                     "testIterations": 10,
                     "degreeOfParallelism": 100,
-                    "sleepInterval": 0
+                    "sleepInterval": 1
                 }
             ]
         }

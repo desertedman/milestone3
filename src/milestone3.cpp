@@ -308,19 +308,19 @@ bool removeItemTest(const int testSize, Stats &stats) {
 }
 
 MethodStats benchmarkCacheManager(const json &config, const int threadId,
-                                  const Ratio &ratios) {
+                                  const Ratio &ratios, const std::string &mode) {
   MethodStats methodStats;
 
   const double sleepIntervalMs =
       static_cast<double>(
-          config["Milestone3"][0]["defaultVariables"][0]["sleepInterval"]) *
+          config["Milestone3"][0][mode][0]["sleepInterval"]) *
       1000.f;
   const int testSize =
-      config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+      config["Milestone3"][0][mode][0]["testSize"];
   [[maybe_unused]] const int degreeOfParallelism =
-      config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"];
+      config["Milestone3"][0][mode][0]["degreeOfParallelism"];
   const int testIterations =
-      config["Milestone3"][0]["defaultVariables"][0]["testIterations"];
+      config["Milestone3"][0][mode][0]["testIterations"];
 
   auto schedule = Schedule::buildSchedule(ratios, testIterations);
   // std::cout << "Schedule size: " + std::to_string(schedule.size()) + "\n";
@@ -387,11 +387,11 @@ MethodStats benchmarkCacheManager(const json &config, const int threadId,
   return methodStats;
 }
 
-void testCacheManager(const json &config) {
+void testCacheManager(const json &config, const std::string &mode) {
   auto &cm = getCacheManager();
 
   [[maybe_unused]] int testSize =
-      config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+      config["Milestone3"][0][mode][0]["testSize"];
   for (int key = 10; key < 20; key++) {
     std::string value = "Test value for key: " + std::to_string(key);
     cm.add(key, value);
@@ -419,7 +419,7 @@ void printStats(std::string method, const Stats &stats) {
 *
 * @return   nothing, but output is sent to console and written to output file
 */
-void timeWrapper(json config) {
+void timeWrapper(json config, const std::string &mode) {
     // set the start time
     auto start = std::chrono::system_clock::now();
     std::time_t start_time = std::chrono::system_clock::to_time_t(start);
@@ -459,7 +459,7 @@ void timeWrapper(json config) {
     // output some helpful comments to the console
     std::cout << "\nStarting computation at " << std::ctime(&start_time);
 
-    int testSize = config["Milestone3"][0]["defaultVariables"][0]["testSize"];
+    int testSize = config["Milestone3"][0][mode][0]["testSize"];
     
     // Allocate the cache manager
     auto &cm = getCacheManager(); // Get cm using singleton
@@ -484,7 +484,7 @@ void timeWrapper(json config) {
     //     Add thread ID as the first column.
 
     // Dispatch threads to run benchmarks
-    const size_t numThreads{config["Milestone3"][0]["defaultVariables"][0]["degreeOfParallelism"]};
+    const size_t numThreads{config["Milestone3"][0][mode][0]["degreeOfParallelism"]};
     std::vector<std::future<MethodStats>> threads;
     threads.reserve(numThreads);
     assert(numThreads == threads.capacity()); // Ensure threads size is properly allocated
@@ -495,7 +495,7 @@ void timeWrapper(json config) {
     assert(numThreads == methodStatsVector.capacity()); // Ensure methodStatsVector size is properly allocated
 
     for (size_t i{0}; i < numThreads; i++) {
-        threads.emplace_back(std::async(benchmarkCacheManager, config, i + 1, ratios));
+        threads.emplace_back(std::async(benchmarkCacheManager, config, i + 1, ratios, mode));
     }
 
     // Wait until all threads are finished
@@ -594,7 +594,37 @@ void staticRatio(json config) {
     logToFileAndConsole("\tsleepInterval: " + std::to_string(sleepInterval));
 
     // call to the timing wrapper (i.e., call the actual benchmark)
-    timeWrapper(config);
+    timeWrapper(config, "defaultVariables");
+
+    logToFileAndConsole("\nFinished processing benchmark.\n\n");
+}
+
+void dynamicRatio(json config) {
+    logToFileAndConsole("\nProcessing dynamicRatio benchmark.\n\n");
+    logToFileAndConsole("Configuration for benchmark run:\n");
+
+    // Retrieve configured Test Type
+    std::string testType = config["Milestone3"][0]["overwriteVariables"][0]["testType"];
+    logToFileAndConsole("\ttestType: " + testType);
+
+    // Retrieve configured Test Size
+    int testSize = config["Milestone3"][0]["overwriteVariables"][0]["testSize"];
+    logToFileAndConsole("\ttestSize: " + std::to_string(testSize));
+
+    // Retrieve configured Test Iterations
+    int testIterations = config["Milestone3"][0]["overwriteVariables"][0]["testIterations"];
+    logToFileAndConsole("\ttestIterations: " + std::to_string(testIterations));
+
+    // Retrieve configured Degree of Parallelism
+    int degreeOfParallelism = config["Milestone3"][0]["overwriteVariables"][0]["degreeOfParallelism"];
+    logToFileAndConsole("\tdegreeOfParallelism: " + std::to_string(degreeOfParallelism));
+
+    // Retrieve configured Sleep Interval
+    int sleepInterval = config["Milestone3"][0]["overwriteVariables"][0]["sleepInterval"];
+    logToFileAndConsole("\tsleepInterval: " + std::to_string(sleepInterval));
+
+    // call to the timing wrapper (i.e., call the actual benchmark)
+    timeWrapper(config, "overwriteVariables");
 
     logToFileAndConsole("\nFinished processing benchmark.\n\n");
 }
@@ -612,11 +642,14 @@ void staticRatio(json config) {
 */
 void benchmarkWrapper(json config) {
     // Retrieve configured Test Type
-    std::string testType = config["Milestone3"][0]["defaultVariables"][0]["testType"];
+    std::string testType = config["Milestone3"][0]["overwriteVariables"][0]["testType"];
 
     if (testType == "static") {
         staticRatio(config);
     }
+
+    else if (testType == "dynamic")
+        dynamicRatio(config);
 }
 
 
