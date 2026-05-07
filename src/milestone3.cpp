@@ -114,7 +114,16 @@ struct MethodStats {
     finalStats.numCalls += stats.numCalls;
   }
 
-  static void calculateAverages(Stats &stats) { stats.avg /= stats.numCalls; }
+  static void calculateAverages(Stats &stats) {
+    // Safeguard against division by 0
+    if (stats.numCalls != 0)
+      stats.avg /= stats.numCalls;
+
+    else {
+      stats.avg = 0;
+      stats.min = 0; // Set min to 0 because it is initialized as 300
+    }
+  }
 
   Stats getItemStats;
   Stats addStats;
