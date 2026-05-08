@@ -542,14 +542,12 @@ void timeWrapper(json config, const std::string &mode) {
     printStats("remove", finalStats.removeStats);
     logToFileAndConsole("clear\t\t" + std::to_string(clearTime.count()));
     logToFileAndConsole("loadCache\t\t" + std::to_string(loadCacheTime.count()));
-    auto totalCalls = [finalStats]() {
-      return finalStats.getItemStats.numCalls + finalStats.addStats.numCalls +
-             finalStats.containsStats.numCalls +
-             finalStats.removeStats.numCalls;
-    };
-    logToFileAndConsole("Total calls: " + std::to_string(totalCalls()));
+    auto totalCalls =
+        finalStats.getItemStats.numCalls + finalStats.addStats.numCalls +
+        finalStats.containsStats.numCalls + finalStats.removeStats.numCalls;
 
-    logToFileAndConsole("\n\n");
+    logToFileAndConsole("Total calls: " + std::to_string(totalCalls));
+
 
     // set the end time
     auto finalEnd = std::chrono::system_clock::now();
@@ -557,6 +555,10 @@ void timeWrapper(json config, const std::string &mode) {
     std::chrono::duration<double> elapsed_seconds = finalEnd - start;
     std::time_t end_time = std::chrono::system_clock::to_time_t(finalEnd);
 
+    auto callsPerSec = totalCalls / elapsed_seconds.count();
+    logToFileAndConsole("Calls per second: " + std::to_string(callsPerSec));
+
+    logToFileAndConsole("\n\n");
     std::cout << "Finished computation at " << std::ctime(&end_time)
         << "Elapsed time: " << elapsed_seconds.count() << "s"
         << std::endl << std::endl;

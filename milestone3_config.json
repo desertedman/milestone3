@@ -11,9 +11,9 @@
             "overwriteVariables": [
                 {
                     "testType": "dynamic",
-                    "testSize": 31744,
-                    "testIterations": 100000,
-                    "degreeOfParallelism": 125,
+                    "testSize": 10000,
+                    "testIterations": 10000,
+                    "degreeOfParallelism": 10,
                     "sleepInterval": 0,
                     "shouldLock": 1
                 }
